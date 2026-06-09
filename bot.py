@@ -33,7 +33,6 @@ def main():
     bot_app = (
         Application.builder()
         .token(TELEGRAM_TOKEN)
-        .job_queue(True)
         .build()
     )
 

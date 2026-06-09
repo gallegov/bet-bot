@@ -1,10 +1,11 @@
 import logging
 import asyncio
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from config.settings import TELEGRAM_TOKEN
 from handlers.bet_handler import handle_bet_image, cmd_start, cmd_help
-from handlers.update_handler import cmd_update
+from handlers.update_handler import cmd_update, callback_resolver
 from handlers.stats_handler import cmd_stats
+from handlers.surebets_handler import cmd_resolver_surebets, callback_surebet_resolver
 from flask import Flask
 import threading
 import os
@@ -25,22 +26,29 @@ logging.basicConfig(
 )
 
 def main():
-
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
+    bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
 
-    app.add_handler(CommandHandler("start", cmd_start))
-    app.add_handler(CommandHandler("help", cmd_help))
-    app.add_handler(CommandHandler("actualizar", cmd_update))
-    app.add_handler(CommandHandler("stats", cmd_stats))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_bet_image))
-    
+    # ── Comandos ────────────────────────────────────────────────────────────
+    bot_app.add_handler(CommandHandler("start",             cmd_start))
+    bot_app.add_handler(CommandHandler("help",              cmd_help))
+    bot_app.add_handler(CommandHandler("actualizar",        cmd_update))
+    bot_app.add_handler(CommandHandler("stats",             cmd_stats))
+    bot_app.add_handler(CommandHandler("resolver_surebets", cmd_resolver_surebets))
+
+    # ── Mensajes con foto (enrutado internamente por tema) ──────────────────
+    bot_app.add_handler(MessageHandler(filters.PHOTO, handle_bet_image))
+
+    # ── Callbacks de botones inline ─────────────────────────────────────────
+    bot_app.add_handler(CallbackQueryHandler(callback_resolver,        pattern="^res_"))
+    bot_app.add_handler(CallbackQueryHandler(callback_surebet_resolver, pattern="^sb_WIN_"))
+
     threading.Thread(target=run_server).start()
 
     print("🤖 Bot iniciado. Esperando capturas...")
-    app.run_polling()
-    
+    bot_app.run_polling()
+
 if __name__ == "__main__":
     main()

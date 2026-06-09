@@ -1,10 +1,14 @@
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from services.vision_service import extract_bet_from_image
-from services.sheets_service import add_bet, init_sheet
-from utils.topic_filter import check_topic, log_thread_id, TEMA_CAPTURAS
+from services.sheets_service import add_bet
+from utils.topic_filter import check_topic, log_thread_id, TEMA_CAPTURAS, TEMA_SUREBETS
+from utils.security import security_check
+from config.settings import TOPIC_SUREBETS
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await security_check(update, context):
+        return
     await update.message.reply_text(
         "👋 *Bot de Apuestas activo*\n\n"
         "📸 Mándame una captura de pantalla de una apuesta y la registro automáticamente.\n\n"
@@ -16,6 +20,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await security_check(update, context):
+        return
     await update.message.reply_text(
         "ℹ️ *Cómo usar el bot:*\n\n"
         "1. Haz una captura de la apuesta en la app de tu casa de apuestas\n"
@@ -29,12 +35,22 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def handle_bet_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    log_thread_id(update)  # imprime el thread_id en consola para configuración
+    if not await security_check(update, context):
+        return
+    log_thread_id(update)
+
+    # ── Enrutamiento por tema ──────────────────────────────────────────────
+    thread_id = getattr(update.effective_message, "message_thread_id", None)
+    if TOPIC_SUREBETS and thread_id == TOPIC_SUREBETS:
+        from handlers.surebets_handler import handle_surebet_image
+        await handle_surebet_image(update, context)
+        return
+
     if not await check_topic(update, TEMA_CAPTURAS):
         return
+
     msg = await update.message.reply_text("🔍 Analizando la captura...")
 
-    # Descarga la imagen en máxima resolución
     photo = update.message.photo[-1]
     file = await context.bot.get_file(photo.file_id)
     image_bytes = await file.download_as_bytearray()
@@ -50,7 +66,6 @@ async def handle_bet_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Rellenar campos que falten con valores por defecto
     bet_data.setdefault("casa", "Desconocida")
     bet_data.setdefault("deporte", "Fútbol")
 

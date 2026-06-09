@@ -14,20 +14,21 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from config.settings import (
     TOPIC_CAPTURAS, TOPIC_ESTADISTICAS,
-    TOPIC_CIERRE, TOPIC_SALDO
+    TOPIC_CIERRE, TOPIC_SALDO, TOPIC_SUREBETS
 )
 
-# Nombres legibles para los mensajes de error
 TEMA_CAPTURAS     = "capturas"
 TEMA_ESTADISTICAS = "estadisticas"
 TEMA_CIERRE       = "cierre"
 TEMA_SALDO        = "saldo"
+TEMA_SUREBETS     = "surebets"
 
 _TOPIC_MAP = {
     TEMA_CAPTURAS:     (TOPIC_CAPTURAS,     "📸 Capturas y Resultados"),
     TEMA_ESTADISTICAS: (TOPIC_ESTADISTICAS, "📊 Estadísticas"),
     TEMA_CIERRE:       (TOPIC_CIERRE,       "📅 Cierre Mensual"),
     TEMA_SALDO:        (TOPIC_SALDO,        "💶 Consultar saldo"),
+    TEMA_SUREBETS:     (TOPIC_SUREBETS,     "🔒 Surebets"),
 }
 
 def _get_thread_id(update: Update) -> int | None:

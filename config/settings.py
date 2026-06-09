@@ -1,12 +1,13 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()  # carga anticipada para que os.getenv funcione en este módulo
-
 load_dotenv()
 
 # Telegram
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+
+# Seguridad — solo responde mensajes de este grupo
+ALLOWED_GROUP_ID = int(os.getenv("ID_GRUPO", 0))  # 0 = sin restricción (desarrollo)
 
 # Anthropic (Claude Vision)
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
@@ -52,7 +53,24 @@ ESTADO_VOID      = "VOID"
 # enviando cualquier mensaje en ese tema y mirando "message_thread_id"
 # en los logs (el bot los imprime al arrancar con nivel INFO).
 # Ponlos también en el .env para no hardcodearlos aquí.
-TOPIC_CAPTURAS       = int(os.getenv("TOPIC_CAPTURAS", 0))       # "Capturas y Resultados"
-TOPIC_ESTADISTICAS   = int(os.getenv("TOPIC_ESTADISTICAS", 0))   # "Estadísticas"
-TOPIC_CIERRE         = int(os.getenv("TOPIC_CIERRE", 0))          # "Cierre Mensual"
-TOPIC_SALDO          = int(os.getenv("TOPIC_SALDO", 0))           # "Consultar saldo"
+TOPIC_CAPTURAS       = int(os.getenv("TOPIC_CAPTURAS", 0))
+TOPIC_ESTADISTICAS   = int(os.getenv("TOPIC_ESTADISTICAS", 0))
+TOPIC_CIERRE         = int(os.getenv("TOPIC_CIERRE", 0))
+TOPIC_SALDO          = int(os.getenv("TOPIC_SALDO", 0))
+TOPIC_SUREBETS       = int(os.getenv("TOPIC_SUREBETS", 0))
+
+# Hoja de Surebets — columnas (A=1, B=2, ...)
+SHEET_NAME_SUREBETS = "Surebets"
+COL_SB = {
+    "ID":           1,   # ID numérico autoincremental
+    "SUREBET_ID":   2,   # UUID corto que vincula las dos filas del par
+    "FECHA":        3,
+    "PARTIDO":      4,
+    "CASA":         5,
+    "PRONOSTICO":   6,
+    "CUOTA":        7,
+    "IMPORTE":      8,
+    "RETORNO":      9,   # cuota * importe (calculado al guardar)
+    "ESTADO":       10,  # PENDIENTE / GANADA / PERDIDA
+    "BENEFICIO":    11,
+}

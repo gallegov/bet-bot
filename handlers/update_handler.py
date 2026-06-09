@@ -1,15 +1,19 @@
-from telegram import Update
-from telegram.ext import ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes, CallbackQueryHandler
 from services.sheets_service import get_pending_bets, update_bet_result
 from services.sports_service import get_result
 from services.resolver_service import resolver_apuesta
 from config.settings import ESTADO_GANADA, ESTADO_PERDIDA
 from utils.topic_filter import check_topic, log_thread_id, TEMA_CAPTURAS
+from utils.security import security_check
 
 async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await security_check(update, context):
+        return
     log_thread_id(update)
     if not await check_topic(update, TEMA_CAPTURAS):
         return
+
     msg = await update.message.reply_text("🔄 Buscando apuestas pendientes...")
 
     pending = get_pending_bets()
@@ -18,11 +22,13 @@ async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text("✅ No hay apuestas pendientes de comprobar.")
         return
 
-    await msg.edit_text(f"⚽ Encontradas *{len(pending)}* apuestas pendientes.\nConsultando resultados...", parse_mode="Markdown")
+    await msg.edit_text(
+        f"⚽ Encontradas *{len(pending)}* apuestas pendientes.\nConsultando resultados...",
+        parse_mode="Markdown"
+    )
 
-    resumen = []
+    resumen_auto = []
     actualizadas = 0
-    sin_resultado = 0
 
     for bet in pending:
         deporte     = bet.get("Deporte", "Fútbol")
@@ -31,39 +37,97 @@ async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
         row_idx     = bet["row_index"]
         bet_id      = bet.get("ID", "?")
         descripcion = bet.get("Descripción", "")
-        importe     = bet.get("Importe (€)", 0)
 
         resultado = get_result(deporte, evento, fecha)
         estado, desc_res, beneficio = resolver_apuesta(bet, resultado)
 
-        if estado is None:
-            sin_resultado += 1
-            resumen.append(f"⏳ #{bet_id} {evento[:30]} — sin resultado todavía")
-            continue
+        if estado is not None:
+            # Resuelta automáticamente
+            update_bet_result(row_idx, estado, desc_res, beneficio)
+            actualizadas += 1
+            emoji = "✅" if estado == ESTADO_GANADA else "❌"
+            resumen_auto.append(
+                f"{emoji} #{bet_id} {evento[:25]}\n"
+                f"   {descripcion[:30]} → {desc_res}\n"
+                f"   {beneficio:+.2f}€"
+            )
+        else:
+            # No resuelta — mandamos botones para resolución manual
+            importe = float(bet.get("Importe (€)", 0))
+            cuota   = float(bet.get("Cuota", 1))
+            ganancia = round(importe * cuota - importe, 2)
 
-        update_bet_result(row_idx, estado, desc_res, beneficio)
-        actualizadas += 1
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton(f"✅ Ganada (+{ganancia}€)",  callback_data=f"res_WIN_{row_idx}_{bet_id}_{importe}_{cuota}"),
+                    InlineKeyboardButton(f"❌ Perdida (-{importe}€)", callback_data=f"res_LOSE_{row_idx}_{bet_id}_{importe}_{cuota}"),
+                ],
+                [
+                    InlineKeyboardButton("🚫 Void (devuelto)",        callback_data=f"res_VOID_{row_idx}_{bet_id}_{importe}_{cuota}"),
+                ]
+            ])
 
-        emoji = "✅" if estado == ESTADO_GANADA else "❌"
-        signo = "+" if beneficio >= 0 else ""
-        resumen.append(
-            f"{emoji} #{bet_id} {evento[:25]}\n"
-            f"   {descripcion[:30]} → {desc_res}\n"
-            f"   {signo}{beneficio:.2f}€"
+            await update.message.reply_text(
+                f"❓ *Apuesta #{bet_id} — resolución manual*\n\n"
+                f"🏟 {evento}\n"
+                f"🎯 {descripcion}\n"
+                f"📅 {fecha or 'sin fecha'}\n"
+                f"📈 Cuota {cuota} · {importe}€ apostados",
+                parse_mode="Markdown",
+                reply_markup=keyboard
+            )
+
+    # Resumen de las resueltas automáticamente
+    if resumen_auto:
+        txt = "\n\n".join(resumen_auto)
+        await msg.edit_text(
+            f"📊 *Resueltas automáticamente: {actualizadas}*\n\n{txt}",
+            parse_mode="Markdown"
+        )
+    else:
+        await msg.edit_text(
+            "ℹ️ Ninguna apuesta pudo resolverse automáticamente.\n"
+            "Usa los botones de arriba para marcarlas manualmente.",
+            parse_mode="Markdown"
         )
 
-    resumen_txt = "\n\n".join(resumen)
-    total_bn = sum(
-        resolver_apuesta(b, get_result(b.get("Deporte",""), b.get("Evento",""), b.get("Fecha partido","")))[2]
-        for b in pending
-        if resolver_apuesta(b, get_result(b.get("Deporte",""), b.get("Evento",""), b.get("Fecha partido","")))[0] is not None
-    )
 
-    await msg.edit_text(
-        f"📊 *Actualización completada*\n"
-        f"✅ Resueltas: {actualizadas} · ⏳ Sin resultado: {sin_resultado}\n\n"
-        f"{resumen_txt}\n\n"
-        f"💰 Balance neto de esta actualización: *{total_bn:+.2f}€*\n"
-        f"_(Ver hoja 'Resumen' para estadísticas completas)_",
+async def callback_resolver(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja los botones de resolución manual."""
+    if not await security_check(update, context):
+        return
+
+    query = update.callback_query
+    await query.answer()
+
+    # Formato: res_WIN_rowIdx_betId_importe_cuota
+    parts = query.data.split("_")
+    accion   = parts[1]          # WIN / LOSE / VOID
+    row_idx  = int(parts[2])
+    bet_id   = parts[3]
+    importe  = float(parts[4])
+    cuota    = float(parts[5])
+
+    if accion == "WIN":
+        estado    = ESTADO_GANADA
+        beneficio = round(importe * cuota - importe, 2)
+        resultado = "Ganada manualmente"
+        emoji     = "✅"
+    elif accion == "LOSE":
+        estado    = ESTADO_PERDIDA
+        beneficio = -importe
+        resultado = "Perdida manualmente"
+        emoji     = "❌"
+    else:  # VOID
+        estado    = "VOID"
+        beneficio = 0.0
+        resultado = "Void / devuelta"
+        emoji     = "🚫"
+
+    update_bet_result(row_idx, estado, resultado, beneficio)
+
+    await query.edit_message_text(
+        f"{emoji} *Apuesta #{bet_id} marcada como {estado}*\n"
+        f"Beneficio registrado: *{beneficio:+.2f}€*",
         parse_mode="Markdown"
     )

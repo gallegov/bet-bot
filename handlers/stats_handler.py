@@ -3,8 +3,11 @@ from telegram.ext import ContextTypes
 from services.sheets_service import get_pending_bets, _get_sheet
 from config.settings import SHEET_NAME_BETS, ESTADO_GANADA, ESTADO_PERDIDA
 from utils.topic_filter import check_topic, log_thread_id, TEMA_ESTADISTICAS
+from utils.security import security_check
 
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await security_check(update, context):
+        return
     log_thread_id(update)
     if not await check_topic(update, TEMA_ESTADISTICAS):
         return

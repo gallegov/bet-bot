@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from config.settings import TELEGRAM_TOKEN
 from handlers.bet_handler import handle_bet_image, cmd_start, cmd_help
@@ -36,6 +37,9 @@ def main():
 
     print("🤖 Bot iniciado. Esperando capturas...")
     app.run_polling()
+    
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
 if __name__ == "__main__":
     main()

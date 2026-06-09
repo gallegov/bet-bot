@@ -29,7 +29,13 @@ def main():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
+    # job_queue=True es necesario para la gestión de álbumes en surebets
+    bot_app = (
+        Application.builder()
+        .token(TELEGRAM_TOKEN)
+        .job_queue(True)
+        .build()
+    )
 
     # ── Comandos ────────────────────────────────────────────────────────────
     bot_app.add_handler(CommandHandler("start",             cmd_start))
@@ -38,11 +44,11 @@ def main():
     bot_app.add_handler(CommandHandler("stats",             cmd_stats))
     bot_app.add_handler(CommandHandler("resolver_surebets", cmd_resolver_surebets))
 
-    # ── Mensajes con foto (enrutado internamente por tema) ──────────────────
+    # ── Fotos (enrutadas internamente por thread_id) ────────────────────────
     bot_app.add_handler(MessageHandler(filters.PHOTO, handle_bet_image))
 
-    # ── Callbacks de botones inline ─────────────────────────────────────────
-    bot_app.add_handler(CallbackQueryHandler(callback_resolver,        pattern="^res_"))
+    # ── Callbacks inline ────────────────────────────────────────────────────
+    bot_app.add_handler(CallbackQueryHandler(callback_resolver,         pattern="^res_"))
     bot_app.add_handler(CallbackQueryHandler(callback_surebet_resolver, pattern="^sb_WIN_"))
 
     threading.Thread(target=run_server).start()

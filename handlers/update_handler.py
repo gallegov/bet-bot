@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from services.sheets_service import get_pending_bets, update_bet_result
@@ -65,6 +66,22 @@ async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
         descripcion = bet.get("Descripción", "")
         casa        = bet.get("Casa", "")
         importe     = float(bet.get("Importe (€)", 0) or 0)
+
+        # Saltar apuestas cuya fecha de partido aún no ha llegado
+        if fecha:
+            try:
+                for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
+                    try:
+                        fecha_dt = datetime.strptime(fecha.strip()[:10], fmt)
+                        break
+                    except ValueError:
+                        continue
+                else:
+                    fecha_dt = None
+                if fecha_dt and fecha_dt.date() > datetime.now().date():
+                    continue  # partido futuro, ignorar
+            except Exception:
+                pass  # si no parsea la fecha, seguimos adelante
 
         resultado = await asyncio.to_thread(get_result, deporte, evento, fecha)
         estado, desc_res, beneficio = resolver_apuesta(bet, resultado)

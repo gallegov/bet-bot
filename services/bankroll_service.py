@@ -74,20 +74,28 @@ def _find_casa_row(ws, casa: str) -> int | None:
 
 def _get_or_create_month_col(ws, mes: str) -> int:
     """
-    Busca la columna del mes actual en la fila 1.
+    Busca la columna del mes actual en la fila 1 (desde columna C en adelante).
     Si no existe, la crea en la siguiente columna libre a la derecha.
     Devuelve el índice de columna (1-based).
     """
     headers = ws.row_values(1)  # fila 1 completa
-    for i, h in enumerate(headers):
-        if h.strip() == mes:
+    # Buscar desde columna C (índice 2) en adelante
+    for i in range(2, len(headers)):
+        if headers[i].strip() == mes:
             return i + 1  # 1-based
 
-    # No existe → crear en la siguiente columna libre
-    new_col = len(headers) + 1
-    # Escribir el header del mes
+    # No existe → primera columna libre desde C en adelante (columna 3 mínimo)
+    # Buscamos la última celda con contenido en fila 1 y sumamos 1
+    last_used = 2  # columna B como mínimo (0-indexed)
+    for i in range(2, len(headers)):
+        if headers[i].strip():
+            last_used = i
+    # Si ninguna columna C+ tiene contenido, empezamos en C (col 3, índice 2)
+    new_col = last_used + 2 if any(h.strip() for h in headers[2:]) else 3
+
+    # Escribir el header del mes — gspread requiere lista de listas
     cell = gspread.utils.rowcol_to_a1(1, new_col)
-    ws.update(cell, mes)
+    ws.update([[mes]], cell)
     return new_col
 
 

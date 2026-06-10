@@ -223,28 +223,39 @@ async def callback_surebet_resolver(update: Update, context: ContextTypes.DEFAUL
     # ── Actualizar BankRoll para ambas casas ──────────────────────────────
     g = resumen.get("ganada", {})
     p = resumen.get("perdida", {})
+    bankroll_errores = []
 
     if g.get("casa"):
         try:
             ben = g["beneficio"]
+            logger.info(f"BankRoll ganadora: buscando '{g['casa']}' delta={ben:+.2f}")
             await async_update_bankroll(g["casa"], delta_caja=ben, delta_mes=ben)
         except Exception as e:
-            logger.warning(f"BankRoll casa ganadora '{g['casa']}': {e}")
+            msg_err = f"BankRoll no actualizado para *{g['casa']}*: {e}"
+            logger.warning(msg_err)
+            bankroll_errores.append(f"⚠️ {msg_err}")
 
     if p.get("casa"):
         try:
-            per = -p["perdida"]   # ya es negativo
+            per = -abs(p["perdida"])
+            logger.info(f"BankRoll perdedora: buscando '{p['casa']}' delta={per:+.2f}")
             await async_update_bankroll(p["casa"], delta_caja=per, delta_mes=per)
         except Exception as e:
-            logger.warning(f"BankRoll casa perdedora '{p['casa']}': {e}")
+            msg_err = f"BankRoll no actualizado para *{p['casa']}*: {e}"
+            logger.warning(msg_err)
+            bankroll_errores.append(f"⚠️ {msg_err}")
 
     bn    = resumen["beneficio_neto"]
     emoji = "🟢" if bn >= 0 else "🔴"
 
-    await query.edit_message_text(
+    texto = (
         f"✅ *Surebet `{surebet_id}` resuelta*\n\n"
         f"🏆 Ganó: *{g.get('casa','?')}* → +{g.get('beneficio',0):.2f}€\n"
         f"❌ Perdió: *{p.get('casa','?')}* → -{p.get('perdida',0):.2f}€\n\n"
-        f"{emoji} Beneficio neto: *{bn:+.2f}€*",
-        parse_mode="Markdown"
+        f"{emoji} Beneficio neto: *{bn:+.2f}€*"
     )
+    if bankroll_errores:
+        texto += "\n\n" + "\n".join(bankroll_errores)
+        texto += "\n\n_Comprueba que el nombre de la casa en Surebets coincide con el de BankRoll._"
+
+    await query.edit_message_text(texto, parse_mode="Markdown")

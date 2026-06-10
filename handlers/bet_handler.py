@@ -1,8 +1,9 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+import asyncio
+from telegram import Update
 from telegram.ext import ContextTypes
 from services.vision_service import extract_bet_from_image
 from services.sheets_service import add_bet
-from utils.topic_filter import check_topic, log_thread_id, TEMA_CAPTURAS, TEMA_SUREBETS
+from utils.topic_filter import check_topic, log_thread_id, TEMA_CAPTURAS
 from utils.security import security_check
 from config.settings import TOPIC_SUREBETS
 
@@ -39,7 +40,7 @@ async def handle_bet_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     log_thread_id(update)
 
-    # ── Enrutamiento por tema ──────────────────────────────────────────────
+    # Enrutamiento: fotos en el tema de Surebets van a su propio handler
     thread_id = getattr(update.effective_message, "message_thread_id", None)
     if TOPIC_SUREBETS and thread_id == TOPIC_SUREBETS:
         from handlers.surebets_handler import handle_surebet_image
@@ -51,13 +52,19 @@ async def handle_bet_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = await update.message.reply_text("🔍 Analizando la captura...")
 
+    # Descargar imagen
     photo = update.message.photo[-1]
-    file = await context.bot.get_file(photo.file_id)
-    image_bytes = await file.download_as_bytearray()
+    file  = await context.bot.get_file(photo.file_id)
+    image_bytes = bytes(await file.download_as_bytearray())
 
     await msg.edit_text("🧠 Extrayendo datos con IA...")
 
-    bet_data = extract_bet_from_image(bytes(image_bytes))
+    # Claude Vision es síncrono — lo ejecutamos en un thread para no bloquear
+    try:
+        bet_data = await asyncio.to_thread(extract_bet_from_image, image_bytes)
+    except Exception as e:
+        await msg.edit_text(f"❌ Error al analizar la imagen: {e}")
+        return
 
     if not bet_data:
         await msg.edit_text(
@@ -71,15 +78,19 @@ async def handle_bet_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await msg.edit_text("📊 Guardando en Google Sheets...")
 
+    # Sheets también es síncrono — mismo tratamiento
     try:
-        bet_id = add_bet(bet_data)
+        bet_id = await asyncio.to_thread(add_bet, bet_data)
     except Exception as e:
         await msg.edit_text(f"❌ Error al guardar en Sheets: {e}")
         return
 
     cuota   = bet_data.get("cuota", "?")
     importe = bet_data.get("importe", "?")
-    posible_ganancia = round(float(cuota) * float(importe), 2) if cuota and importe else "?"
+    try:
+        posible_ganancia = round(float(cuota) * float(importe), 2)
+    except (TypeError, ValueError):
+        posible_ganancia = "?"
 
     await msg.edit_text(
         f"✅ *Apuesta #{bet_id} registrada*\n\n"

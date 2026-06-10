@@ -28,7 +28,7 @@ def extract_bet_from_image(image_bytes: bytes, mime_type: str = "image/jpeg") ->
     image_b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
 
     message = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-5",
         max_tokens=500,
         messages=[
             {

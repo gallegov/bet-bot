@@ -1,11 +1,37 @@
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from services.sheets_service import get_pending_bets, update_bet_result
 from services.sports_service import get_result
 from services.resolver_service import resolver_apuesta
+from services.bankroll_service import async_update_bankroll
 from config.settings import ESTADO_GANADA, ESTADO_PERDIDA
 from utils.topic_filter import check_topic, log_thread_id, TEMA_CAPTURAS
 from utils.security import security_check
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+async def _apply_bankroll(casa: str, estado: str, beneficio: float, importe: float):
+    """
+    Actualiza BankRoll tras resolver una apuesta normal.
+    - GANADA : suma beneficio neto en caja y en mes
+    - PERDIDA: resta importe en caja y en mes
+    - VOID   : no toca nada
+    """
+    if estado == ESTADO_GANADA:
+        delta = beneficio           # beneficio neto = retorno - stake
+    elif estado == ESTADO_PERDIDA:
+        delta = -abs(importe)
+    else:
+        return  # VOID, no mover bankroll
+
+    try:
+        await async_update_bankroll(casa, delta_caja=delta, delta_mes=delta)
+    except Exception as e:
+        logger.warning(f"BankRoll no actualizado para '{casa}': {e}")
+
 
 async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await security_check(update, context):
@@ -16,7 +42,7 @@ async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = await update.message.reply_text("🔄 Buscando apuestas pendientes...")
 
-    pending = get_pending_bets()
+    pending = await asyncio.to_thread(get_pending_bets)
 
     if not pending:
         await msg.edit_text("✅ No hay apuestas pendientes de comprobar.")
@@ -37,13 +63,15 @@ async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
         row_idx     = bet["row_index"]
         bet_id      = bet.get("ID", "?")
         descripcion = bet.get("Descripción", "")
+        casa        = bet.get("Casa", "")
+        importe     = float(bet.get("Importe (€)", 0) or 0)
 
-        resultado = get_result(deporte, evento, fecha)
+        resultado = await asyncio.to_thread(get_result, deporte, evento, fecha)
         estado, desc_res, beneficio = resolver_apuesta(bet, resultado)
 
         if estado is not None:
-            # Resuelta automáticamente
-            update_bet_result(row_idx, estado, desc_res, beneficio)
+            await asyncio.to_thread(update_bet_result, row_idx, estado, desc_res, beneficio)
+            await _apply_bankroll(casa, estado, beneficio, importe)
             actualizadas += 1
             emoji = "✅" if estado == ESTADO_GANADA else "❌"
             resumen_auto.append(
@@ -52,18 +80,25 @@ async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"   {beneficio:+.2f}€"
             )
         else:
-            # No resuelta — mandamos botones para resolución manual
-            importe = float(bet.get("Importe (€)", 0))
-            cuota   = float(bet.get("Cuota", 1))
+            cuota    = float(bet.get("Cuota", 1) or 1)
             ganancia = round(importe * cuota - importe, 2)
 
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton(f"✅ Ganada (+{ganancia}€)",  callback_data=f"res_WIN_{row_idx}_{bet_id}_{importe}_{cuota}"),
-                    InlineKeyboardButton(f"❌ Perdida (-{importe}€)", callback_data=f"res_LOSE_{row_idx}_{bet_id}_{importe}_{cuota}"),
+                    InlineKeyboardButton(
+                        f"✅ Ganada (+{ganancia}€)",
+                        callback_data=f"res_WIN_{row_idx}_{bet_id}_{importe}_{cuota}_{casa}"
+                    ),
+                    InlineKeyboardButton(
+                        f"❌ Perdida (-{importe}€)",
+                        callback_data=f"res_LOSE_{row_idx}_{bet_id}_{importe}_{cuota}_{casa}"
+                    ),
                 ],
                 [
-                    InlineKeyboardButton("🚫 Void (devuelto)",        callback_data=f"res_VOID_{row_idx}_{bet_id}_{importe}_{cuota}"),
+                    InlineKeyboardButton(
+                        "🚫 Void (devuelto)",
+                        callback_data=f"res_VOID_{row_idx}_{bet_id}_{importe}_{cuota}_{casa}"
+                    ),
                 ]
             ])
 
@@ -77,7 +112,6 @@ async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=keyboard
             )
 
-    # Resumen de las resueltas automáticamente
     if resumen_auto:
         txt = "\n\n".join(resumen_auto)
         await msg.edit_text(
@@ -93,20 +127,22 @@ async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def callback_resolver(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Maneja los botones de resolución manual."""
+    """Botones de resolución manual — ahora también actualizan BankRoll."""
     if not await security_check(update, context):
         return
 
     query = update.callback_query
     await query.answer()
 
-    # Formato: res_WIN_rowIdx_betId_importe_cuota
-    parts = query.data.split("_")
-    accion   = parts[1]          # WIN / LOSE / VOID
-    row_idx  = int(parts[2])
-    bet_id   = parts[3]
-    importe  = float(parts[4])
-    cuota    = float(parts[5])
+    # Formato: res_ACCION_rowIdx_betId_importe_cuota_casa
+    # Casa puede tener espacios → split con maxsplit=6
+    parts  = query.data.split("_", 6)
+    accion  = parts[1]
+    row_idx = int(parts[2])
+    bet_id  = parts[3]
+    importe = float(parts[4])
+    cuota   = float(parts[5])
+    casa    = parts[6] if len(parts) > 6 else ""
 
     if accion == "WIN":
         estado    = ESTADO_GANADA
@@ -124,7 +160,8 @@ async def callback_resolver(update: Update, context: ContextTypes.DEFAULT_TYPE):
         resultado = "Void / devuelta"
         emoji     = "🚫"
 
-    update_bet_result(row_idx, estado, resultado, beneficio)
+    await asyncio.to_thread(update_bet_result, row_idx, estado, resultado, beneficio)
+    await _apply_bankroll(casa, estado, beneficio, importe)
 
     await query.edit_message_text(
         f"{emoji} *Apuesta #{bet_id} marcada como {estado}*\n"

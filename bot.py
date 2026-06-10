@@ -6,6 +6,7 @@ from handlers.bet_handler import handle_bet_image, cmd_start, cmd_help
 from handlers.update_handler import cmd_update, callback_resolver
 from handlers.stats_handler import cmd_stats
 from handlers.surebets_handler import cmd_resolver_surebets, callback_surebet_resolver
+from handlers.bankroll_handler import build_bankroll_handlers
 from flask import Flask
 import threading
 import os
@@ -29,24 +30,23 @@ def main():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    # job_queue=True es necesario para la gestión de álbumes en surebets
-    bot_app = (
-        Application.builder()
-        .token(TELEGRAM_TOKEN)
-        .build()
-    )
+    bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
 
-    # ── Comandos ────────────────────────────────────────────────────────────
+    # ── Comandos generales ───────────────────────────────────────────────────
     bot_app.add_handler(CommandHandler("start",             cmd_start))
     bot_app.add_handler(CommandHandler("help",              cmd_help))
     bot_app.add_handler(CommandHandler("actualizar",        cmd_update))
     bot_app.add_handler(CommandHandler("stats",             cmd_stats))
     bot_app.add_handler(CommandHandler("resolver_surebets", cmd_resolver_surebets))
 
-    # ── Fotos (enrutadas internamente por thread_id) ────────────────────────
+    # ── Bankroll: /deposito, /retiro, /saldo ─────────────────────────────────
+    for handler in build_bankroll_handlers():
+        bot_app.add_handler(handler)
+
+    # ── Fotos (enrutadas internamente por thread_id) ─────────────────────────
     bot_app.add_handler(MessageHandler(filters.PHOTO, handle_bet_image))
 
-    # ── Callbacks inline ────────────────────────────────────────────────────
+    # ── Callbacks inline ─────────────────────────────────────────────────────
     bot_app.add_handler(CallbackQueryHandler(callback_resolver,         pattern="^res_"))
     bot_app.add_handler(CallbackQueryHandler(callback_surebet_resolver, pattern="^sb_WIN_"))
 

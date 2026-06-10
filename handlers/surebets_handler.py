@@ -229,7 +229,8 @@ async def callback_surebet_resolver(update: Update, context: ContextTypes.DEFAUL
         try:
             ben = g["beneficio"]
             logger.info(f"BankRoll ganadora: buscando '{g['casa']}' delta={ben:+.2f}")
-            await async_update_bankroll(g["casa"], delta_caja=ben, delta_mes=ben)
+            # delta_mes=0: las surebets no computan como P&L mensual por casa
+            await async_update_bankroll(g["casa"], delta_caja=ben, delta_mes=0)
         except Exception as e:
             msg_err = f"BankRoll no actualizado para *{g['casa']}*: {e}"
             logger.warning(msg_err)
@@ -239,7 +240,8 @@ async def callback_surebet_resolver(update: Update, context: ContextTypes.DEFAUL
         try:
             per = -abs(p["perdida"])
             logger.info(f"BankRoll perdedora: buscando '{p['casa']}' delta={per:+.2f}")
-            await async_update_bankroll(p["casa"], delta_caja=per, delta_mes=per)
+            # delta_mes=0: las surebets no computan como P&L mensual por casa
+            await async_update_bankroll(p["casa"], delta_caja=per, delta_mes=0)
         except Exception as e:
             msg_err = f"BankRoll no actualizado para *{p['casa']}*: {e}"
             logger.warning(msg_err)

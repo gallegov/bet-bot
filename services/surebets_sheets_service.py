@@ -1,11 +1,3 @@
-"""
-Gestión de Surebets en Google Sheets.
-
-Cada surebet ocupa DOS filas vinculadas por un SUREBET_ID (UUID corto).
-Estructura de la hoja:
-  ID | SUREBET_ID | Fecha | Partido | Casa | Pronóstico | Cuota | Importe | Retorno | Estado | Beneficio
-"""
-
 import uuid
 import gspread
 from google.oauth2.service_account import Credentials
@@ -21,32 +13,24 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 
-
-# ── Conexión ────────────────────────────────────────────────────────────────
+def _client():
+    creds = Credentials.from_service_account_file(GOOGLE_SHEETS_CREDENTIALS_FILE, scopes=SCOPES)
+    return gspread.Client(auth=creds)
 
 def _get_sheet():
-    creds = Credentials.from_service_account_file(GOOGLE_SHEETS_CREDENTIALS_FILE, scopes=SCOPES)
-    gc = gspread.authorize(creds)
-    return gc.open_by_key(GOOGLE_SHEET_ID).worksheet(SHEET_NAME_SUREBETS)
-
+    return _client().open_by_key(GOOGLE_SHEET_ID).worksheet(SHEET_NAME_SUREBETS)
 
 def _next_id(ws) -> int:
     values = ws.col_values(COL_SB["ID"])
     ids = [int(v) for v in values[1:] if str(v).isdigit()]
     return max(ids, default=0) + 1
 
-
-# ── Inicialización ──────────────────────────────────────────────────────────
-
 def init_surebets_sheet():
-    """Crea la hoja 'Surebets' con cabeceras y formato si no existe."""
-    creds = Credentials.from_service_account_file(GOOGLE_SHEETS_CREDENTIALS_FILE, scopes=SCOPES)
-    gc = gspread.authorize(creds)
+    gc = _client()
     sh = gc.open_by_key(GOOGLE_SHEET_ID)
-
     names = [ws.title for ws in sh.worksheets()]
     if SHEET_NAME_SUREBETS in names:
-        return  # ya existe
+        return
 
     ws = sh.add_worksheet(title=SHEET_NAME_SUREBETS, rows=500, cols=12)
     headers = [
@@ -63,44 +47,29 @@ def init_surebets_sheet():
         },
         "horizontalAlignment": "CENTER"
     })
-    # Ocultar la columna SUREBET_ID (columna B) — es interna
-    sh.batch_update({
-        "requests": [{
-            "updateDimensionProperties": {
-                "range": {
-                    "sheetId": ws.id,
-                    "dimension": "COLUMNS",
-                    "startIndex": 1,   # columna B (0-indexed)
-                    "endIndex": 2
-                },
-                "properties": {"hiddenByUser": True},
-                "fields": "hiddenByUser"
-            }
-        }]
-    })
-
-
-# ── Escritura ───────────────────────────────────────────────────────────────
+    # Ocultar columna Surebet ID (B)
+    sh.batch_update({"requests": [{
+        "updateDimensionProperties": {
+            "range": {
+                "sheetId": ws.id,
+                "dimension": "COLUMNS",
+                "startIndex": 1,
+                "endIndex": 2
+            },
+            "properties": {"hiddenByUser": True},
+            "fields": "hiddenByUser"
+        }
+    }]})
 
 def add_surebet(surebet_data: dict) -> str:
-    """
-    Guarda las DOS filas vinculadas de una surebet.
-    Devuelve el surebet_id (UUID corto) para referencia.
-
-    surebet_data esperado (output de vision_service):
-    {
-      "partido": "X vs Y",
-      "apuesta_1": {"casa_de_apuestas": ..., "pronostico": ..., "cuota": ..., "cantidad_apostada": ...},
-      "apuesta_2": {"casa_de_apuestas": ..., "pronostico": ..., "cuota": ..., "cantidad_apostada": ...}
-    }
-    """
     ws = _get_sheet()
-    surebet_id = uuid.uuid4().hex[:8].upper()   # ej. "A3F9C21B"
-    fecha = datetime.now().strftime("%d/%m/%Y %H:%M")
+    surebet_id = uuid.uuid4().hex[:8].upper()
+    fecha  = datetime.now().strftime("%d/%m/%Y %H:%M")
     partido = surebet_data.get("partido", "Partido desconocido")
 
+    rows_to_append = []
     for apuesta in (surebet_data["apuesta_1"], surebet_data["apuesta_2"]):
-        row_id = _next_id(ws)
+        row_id  = _next_id(ws) + len(rows_to_append)  # evita ID duplicado en batch
         cuota   = float(apuesta.get("cuota", 1))
         importe = float(apuesta.get("cantidad_apostada", 0))
         retorno = round(cuota * importe, 2)
@@ -117,35 +86,25 @@ def add_surebet(surebet_data: dict) -> str:
         row[COL_SB["RETORNO"] - 1]    = retorno
         row[COL_SB["ESTADO"] - 1]     = ESTADO_PENDIENTE
         row[COL_SB["BENEFICIO"] - 1]  = ""
-        ws.append_row(row)
+        rows_to_append.append(row)
 
+    # Escribir las dos filas de golpe
+    ws.append_rows(rows_to_append, value_input_option="USER_ENTERED")
     return surebet_id
 
-
-# ── Lectura ─────────────────────────────────────────────────────────────────
-
 def get_pending_surebets() -> list[dict]:
-    """
-    Devuelve una lista de surebets pendientes, agrupadas por SUREBET_ID.
-    Cada elemento tiene: surebet_id, partido, apuesta_1, apuesta_2
-    (con row_index para poder actualizar).
-    """
     ws = _get_sheet()
     rows = ws.get_all_records()
 
-    # Agrupar por SUREBET_ID
     grupos: dict[str, list] = {}
     for i, r in enumerate(rows):
         if r.get("Estado") != ESTADO_PENDIENTE:
             continue
-        sid = str(r.get("Surebet ID", ""))
+        sid = str(r.get("Surebet ID", "")).strip()
         if not sid:
             continue
-        if sid not in grupos:
-            grupos[sid] = []
-        grupos[sid].append({"row_index": i + 2, **r})
+        grupos.setdefault(sid, []).append({"row_index": i + 2, **r})
 
-    # Filtrar solo pares completos y construir estructura limpia
     result = []
     for sid, filas in grupos.items():
         if len(filas) < 2:
@@ -158,21 +117,14 @@ def get_pending_surebets() -> list[dict]:
         })
     return result
 
-
-# ── Resolución ──────────────────────────────────────────────────────────────
-
-def resolve_surebet(surebet_id: str, casa_ganadora: str):
-    """
-    Actualiza ambas filas de una surebet según la casa ganadora.
-    Devuelve un dict con el resumen financiero.
-    """
+def resolve_surebet(surebet_id: str, casa_ganadora: str) -> dict:
     ws = _get_sheet()
     rows = ws.get_all_records()
 
     filas = [
         {"row_index": i + 2, **r}
         for i, r in enumerate(rows)
-        if str(r.get("Surebet ID", "")) == surebet_id
+        if str(r.get("Surebet ID", "")).strip() == surebet_id
     ]
 
     if len(filas) < 2:
@@ -190,17 +142,13 @@ def resolve_surebet(surebet_id: str, casa_ganadora: str):
             beneficio = round(cuota * importe - importe, 2)
             estado    = ESTADO_GANADA
             resumen["ganada"] = {"casa": casa, "beneficio": beneficio}
-            resumen["beneficio_neto"] += beneficio
         else:
             beneficio = -importe
             estado    = ESTADO_PERDIDA
             resumen["perdida"] = {"casa": casa, "perdida": importe}
-            resumen["beneficio_neto"] += beneficio
 
-        # Actualizar las 3 celdas en una sola llamada batch para reducir cuota de API
-        ws.update(
-            f"J{row_idx}:K{row_idx}",
-            [[estado, round(beneficio, 2)]]
-        )
+        resumen["beneficio_neto"] += beneficio
+        # Columnas J (Estado=10) y K (Beneficio=11)
+        ws.update(f"J{row_idx}:K{row_idx}", [[estado, round(beneficio, 2)]])
 
     return resumen

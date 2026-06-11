@@ -17,19 +17,31 @@ logger = logging.getLogger(__name__)
 async def _apply_bankroll(casa: str, estado: str, beneficio: float, importe: float):
     """
     Actualiza BankRoll tras resolver una apuesta normal.
-    - GANADA : suma beneficio neto en caja y en mes
-    - PERDIDA: resta importe en caja y en mes
-    - VOID   : no toca nada
+    El stake YA fue descontado al registrar la apuesta, así que:
+    - GANADA : devuelve el retorno completo (stake + beneficio neto)
+              delta_caja  = importe + beneficio
+              delta_mes   = beneficio neto (solo la ganancia para P&L)
+    - PERDIDA: el dinero ya salió al registrar, no tocar En Caja.
+              delta_caja  = 0 (ya descontado)
+              delta_mes   = -importe (registrar la pérdida en el mes)
+    - VOID   : devolver el stake que se descontó al registrar
+              delta_caja  = +importe (devolución)
+              delta_mes   = 0
     """
     if estado == ESTADO_GANADA:
-        delta = beneficio           # beneficio neto = retorno - stake
+        delta_caja = importe + beneficio   # retorno completo
+        delta_mes  = beneficio             # solo la ganancia neta en P&L
     elif estado == ESTADO_PERDIDA:
-        delta = -abs(importe)
+        delta_caja = 0                     # ya descontado al registrar
+        delta_mes  = -abs(importe)         # apuntar pérdida en el mes
+    elif estado == "VOID":
+        delta_caja = abs(importe)          # devolver el stake
+        delta_mes  = 0
     else:
-        return  # VOID, no mover bankroll
+        return
 
     try:
-        await async_update_bankroll(casa, delta_caja=delta, delta_mes=delta)
+        await async_update_bankroll(casa, delta_caja=delta_caja, delta_mes=delta_mes)
     except Exception as e:
         logger.warning(f"BankRoll no actualizado para '{casa}': {e}")
 

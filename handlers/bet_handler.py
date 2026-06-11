@@ -1,11 +1,15 @@
 import asyncio
+import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 from services.vision_service import extract_bet_from_image
 from services.sheets_service import add_bet
+from services.bankroll_service import async_deposit_withdraw
 from utils.topic_filter import check_topic, log_thread_id, TEMA_CAPTURAS
 from utils.security import security_check
 from config.settings import TOPIC_SUREBETS
+
+logger = logging.getLogger(__name__)
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await security_check(update, context):
@@ -59,7 +63,6 @@ async def handle_bet_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await msg.edit_text("🧠 Extrayendo datos con IA...")
 
-    # Claude Vision es síncrono — lo ejecutamos en un thread para no bloquear
     try:
         bet_data = await asyncio.to_thread(extract_bet_from_image, image_bytes)
     except Exception as e:
@@ -78,7 +81,6 @@ async def handle_bet_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await msg.edit_text("📊 Guardando en Google Sheets...")
 
-    # Sheets también es síncrono — mismo tratamiento
     try:
         bet_id = await asyncio.to_thread(add_bet, bet_data)
     except Exception as e:
@@ -87,19 +89,34 @@ async def handle_bet_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     cuota   = bet_data.get("cuota", "?")
     importe = bet_data.get("importe", "?")
+    casa    = bet_data.get("casa", "")
     try:
-        posible_ganancia = round(float(cuota) * float(importe), 2)
+        importe_f        = float(importe)
+        posible_ganancia = round(float(cuota) * importe_f, 2)
     except (TypeError, ValueError):
+        importe_f        = 0.0
         posible_ganancia = "?"
+
+    # Restar el importe del BankRoll de la casa al registrar la apuesta
+    bankroll_aviso = ""
+    if casa and importe_f > 0:
+        try:
+            result = await async_deposit_withdraw(casa, -importe_f)
+            nuevo_saldo = result["nuevo_saldo"]
+            bankroll_aviso = f"\n💼 Saldo en *{casa}*: {nuevo_saldo:.2f}€"
+        except Exception as e:
+            logger.warning(f"BankRoll no actualizado al registrar apuesta en '{casa}': {e}")
+            bankroll_aviso = f"\n⚠️ BankRoll no actualizado para *{casa}*"
 
     await msg.edit_text(
         f"✅ *Apuesta #{bet_id} registrada*\n\n"
         f"🏟 {bet_data.get('evento', '?')}\n"
         f"🎯 {bet_data.get('descripcion', '?')}\n"
         f"📅 {bet_data.get('fecha_partido', 'Fecha no detectada')}\n"
-        f"🏠 {bet_data.get('casa', '?')} · {bet_data.get('deporte', '?')}\n"
+        f"🏠 {casa} · {bet_data.get('deporte', '?')}\n"
         f"📈 Cuota: *{cuota}* · Importe: *{importe}€*\n"
-        f"💰 Ganancia potencial: *{posible_ganancia}€*\n\n"
+        f"💰 Ganancia potencial: *{posible_ganancia}€*\n"
+        f"{bankroll_aviso}\n\n"
         f"Estado: ⏳ PENDIENTE",
         parse_mode="Markdown"
     )

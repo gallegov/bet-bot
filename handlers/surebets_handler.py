@@ -120,6 +120,17 @@ async def _run_extraction(context, images_bytes, chat_id, thread_id):
     ret1  = round(float(a1["cuota"]) * float(a1["cantidad_apostada"]), 2)
     ret2  = round(float(a2["cuota"]) * float(a2["cantidad_apostada"]), 2)
 
+    # Descontar el stake de cada casa al registrar la surebet
+    for apuesta in (a1, a2):
+        casa_sb  = apuesta.get("casa_de_apuestas", "")
+        stake_sb = float(apuesta.get("cantidad_apostada", 0))
+        if casa_sb and stake_sb > 0:
+            try:
+                from services.bankroll_service import async_deposit_withdraw
+                await async_deposit_withdraw(casa_sb, -stake_sb)
+            except Exception as e:
+                logger.warning(f"BankRoll no descontado para '{casa_sb}' al registrar surebet: {e}")
+
     await context.bot.edit_message_text(
         chat_id=chat_id, message_id=msg.message_id,
         parse_mode="Markdown",
@@ -227,10 +238,11 @@ async def callback_surebet_resolver(update: Update, context: ContextTypes.DEFAUL
 
     if g.get("casa"):
         try:
-            ben = g["beneficio"]
-            logger.info(f"BankRoll ganadora: buscando '{g['casa']}' delta={ben:+.2f}")
-            # delta_mes=0: las surebets no computan como P&L mensual por casa
-            await async_update_bankroll(g["casa"], delta_caja=ben, delta_mes=0)
+            # Stake ya descontado al registrar → devolver retorno completo (stake + beneficio)
+            importe_g = float(g.get("importe", p.get("perdida", 0)))  # stake de la ganadora
+            retorno_g = importe_g + g["beneficio"]
+            logger.info(f"BankRoll ganadora: '{g['casa']}' retorno={retorno_g:+.2f}")
+            await async_update_bankroll(g["casa"], delta_caja=retorno_g, delta_mes=0)
         except Exception as e:
             msg_err = f"BankRoll no actualizado para *{g['casa']}*: {e}"
             logger.warning(msg_err)
@@ -238,10 +250,10 @@ async def callback_surebet_resolver(update: Update, context: ContextTypes.DEFAUL
 
     if p.get("casa"):
         try:
-            per = -abs(p["perdida"])
-            logger.info(f"BankRoll perdedora: buscando '{p['casa']}' delta={per:+.2f}")
-            # delta_mes=0: las surebets no computan como P&L mensual por casa
-            await async_update_bankroll(p["casa"], delta_caja=per, delta_mes=0)
+            # Stake ya descontado al registrar → En Caja no se toca, perdida ya contabilizada
+            logger.info(f"BankRoll perdedora: '{p['casa']}' stake ya descontado, sin cambio en caja")
+            # No tocar En Caja (delta_caja=0), ni columna mensual (delta_mes=0) para surebets
+            pass
         except Exception as e:
             msg_err = f"BankRoll no actualizado para *{p['casa']}*: {e}"
             logger.warning(msg_err)

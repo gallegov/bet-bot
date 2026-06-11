@@ -7,6 +7,8 @@ from handlers.update_handler import cmd_update, callback_resolver
 from handlers.stats_handler import cmd_stats
 from handlers.surebets_handler import cmd_resolver_surebets, callback_surebet_resolver
 from handlers.bankroll_handler import build_bankroll_handlers
+from handlers.cierre_handler import cmd_cierremes, callback_cierre
+from handlers.editar_handler import build_editar_handler
 from flask import Flask
 import threading
 import os
@@ -38,15 +40,18 @@ def main():
     bot_app.add_handler(CommandHandler("actualizar",        cmd_update))
     bot_app.add_handler(CommandHandler("stats",             cmd_stats))
     bot_app.add_handler(CommandHandler("resolver_surebets", cmd_resolver_surebets))
+    bot_app.add_handler(CommandHandler("cierremes",         cmd_cierremes))
 
     # ── Bankroll: /deposito, /retiro, /saldo ─────────────────────────────────
     for handler in build_bankroll_handlers():
         bot_app.add_handler(handler)
+    bot_app.add_handler(build_editar_handler())
 
     # ── Fotos (enrutadas internamente por thread_id) ─────────────────────────
     bot_app.add_handler(MessageHandler(filters.PHOTO, handle_bet_image))
 
     # ── Callbacks inline ─────────────────────────────────────────────────────
+    bot_app.add_handler(CallbackQueryHandler(callback_cierre,           pattern="^cierre_"))
     bot_app.add_handler(CallbackQueryHandler(callback_resolver,         pattern="^res_"))
     bot_app.add_handler(CallbackQueryHandler(callback_surebet_resolver, pattern="^sb_WIN_"))
 

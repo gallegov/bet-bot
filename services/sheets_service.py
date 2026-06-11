@@ -102,3 +102,29 @@ def get_pending_bets() -> list[dict]:
 def update_bet_result(row_index: int, estado: str, resultado: str, beneficio: float):
     ws = _get_sheet(SHEET_NAME_BETS)
     ws.update(f"K{row_index}:M{row_index}", [[estado, resultado, round(beneficio, 2)]])
+
+def get_bet_by_id(bet_id: int) -> dict | None:
+    """Busca una apuesta por ID. Devuelve la fila con row_index o None."""
+    ws = _get_sheet(SHEET_NAME_BETS)
+    rows = ws.get_all_records()
+    for i, r in enumerate(rows):
+        if str(r.get("ID", "")) == str(bet_id):
+            return {"row_index": i + 2, **r}
+    return None
+
+def update_bet_fields(row_index: int, campos: dict):
+    """
+    Actualiza campos individuales de una apuesta.
+    campos es un dict con claves del COL map: "casa", "fecha_partido", "cuota", "importe"
+    """
+    ws = _get_sheet(SHEET_NAME_BETS)
+    campo_col = {
+        "casa":          COL["CASA"],
+        "fecha_partido": COL["FECHA_PARTIDO"],
+        "cuota":         COL["CUOTA"],
+        "importe":       COL["IMPORTE"],
+    }
+    for campo, valor in campos.items():
+        col = campo_col.get(campo)
+        if col:
+            ws.update_cell(row_index, col, valor)

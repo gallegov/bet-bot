@@ -239,7 +239,7 @@ def _limpiar_hoja_bets(sh, pendientes: list[dict]):
         for r in pendientes:
             fila = [r.get(h, "") for h in cabecera]
             filas.append(fila)
-        ws.append_rows(filas, value_input_option="USER_ENTERED")
+        ws.append_rows(filas, value_input_option="RAW")
 
 
 def _limpiar_hoja_surebets(sh, pendientes_sb: list[dict]):
@@ -258,7 +258,7 @@ def _limpiar_hoja_surebets(sh, pendientes_sb: list[dict]):
         for r in pendientes_sb:
             fila = [r.get(h, "") for h in cabecera]
             filas.append(fila)
-        ws.append_rows(filas, value_input_option="USER_ENTERED")
+        ws.append_rows(filas, value_input_option="RAW")
 
 
 # ── Función principal ────────────────────────────────────────────────────────

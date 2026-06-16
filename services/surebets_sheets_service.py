@@ -89,7 +89,7 @@ def add_surebet(surebet_data: dict) -> str:
         rows_to_append.append(row)
 
     # Escribir las dos filas de golpe
-    ws.append_rows(rows_to_append, value_input_option="USER_ENTERED")
+    ws.append_rows(rows_to_append, value_input_option="RAW")
     return surebet_id
 
 def get_pending_surebets() -> list[dict]:

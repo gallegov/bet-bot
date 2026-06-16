@@ -87,7 +87,7 @@ def add_bet(bet_data: dict) -> int:
     row[COL["RESULTADO"] - 1]     = ""
     row[COL["BENEFICIO"] - 1]     = ""
     row[COL["NOTAS"] - 1]         = bet_data.get("notas", "")
-    ws.append_row(row, value_input_option="USER_ENTERED")
+    ws.append_row(row, value_input_option="RAW")
     return bet_id
 
 def get_pending_bets() -> list[dict]:

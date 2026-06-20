@@ -132,8 +132,8 @@ def update_bankroll(casa: str, delta_caja: float, delta_mes: float) -> dict:
     mes_col  = _get_or_create_month_col(ws, mes)
 
     # Leer valores actuales
-    saldo_actual = _safe_float(ws.cell(row, 1).value)   # columna A
-    mes_actual   = _safe_float(ws.cell(row, mes_col).value)
+    saldo_actual = _safe_float(ws.cell(row, 1, value_render_option='UNFORMATTED_VALUE').value)   # columna A
+    mes_actual   = _safe_float(ws.cell(row, mes_col, value_render_option='UNFORMATTED_VALUE').value)
 
     nuevo_saldo  = round(saldo_actual + delta_caja, 2)
     nuevo_mes    = round(mes_actual + delta_mes, 2)
@@ -174,7 +174,7 @@ def get_all_balances() -> list[dict]:
     [{"casa": "Bet365", "saldo": 150.0}, ...]
     """
     ws    = _get_sheet()
-    col_a = ws.col_values(1)   # En Caja
+    col_a = ws.col_values(1, value_render_option='UNFORMATTED_VALUE')   # En Caja
     col_b = ws.col_values(2)   # Casa de Apuestas
     rows  = max(len(col_a), len(col_b))
 

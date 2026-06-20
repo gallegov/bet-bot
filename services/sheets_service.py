@@ -92,7 +92,7 @@ def add_bet(bet_data: dict) -> int:
 
 def get_pending_bets() -> list[dict]:
     ws = _get_sheet(SHEET_NAME_BETS)
-    rows = ws.get_all_records()
+    rows = ws.get_all_records(value_render_option='UNFORMATTED_VALUE')
     return [
         {"row_index": i + 2, **r}
         for i, r in enumerate(rows)
@@ -106,7 +106,7 @@ def update_bet_result(row_index: int, estado: str, resultado: str, beneficio: fl
 def get_bet_by_id(bet_id: int) -> dict | None:
     """Busca una apuesta por ID. Devuelve la fila con row_index o None."""
     ws = _get_sheet(SHEET_NAME_BETS)
-    rows = ws.get_all_records()
+    rows = ws.get_all_records(value_render_option='UNFORMATTED_VALUE')
     for i, r in enumerate(rows):
         if str(r.get("ID", "")) == str(bet_id):
             return {"row_index": i + 2, **r}

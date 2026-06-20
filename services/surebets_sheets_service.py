@@ -94,7 +94,7 @@ def add_surebet(surebet_data: dict) -> str:
 
 def get_pending_surebets() -> list[dict]:
     ws = _get_sheet()
-    rows = ws.get_all_records()
+    rows = ws.get_all_records(value_render_option='UNFORMATTED_VALUE')
 
     grupos: dict[str, list] = {}
     for i, r in enumerate(rows):
@@ -119,7 +119,7 @@ def get_pending_surebets() -> list[dict]:
 
 def resolve_surebet(surebet_id: str, casa_ganadora: str) -> dict:
     ws = _get_sheet()
-    rows = ws.get_all_records()
+    rows = ws.get_all_records(value_render_option='UNFORMATTED_VALUE')
 
     filas = [
         {"row_index": i + 2, **r}
@@ -152,3 +152,31 @@ def resolve_surebet(surebet_id: str, casa_ganadora: str) -> dict:
         ws.update(f"J{row_idx}:K{row_idx}", [[estado, round(beneficio, 2)]])
 
     return resumen
+
+def fix_number_format_columns():
+    """
+    Utilidad de mantenimiento: limpia el formato numérico de las columnas
+    Cuota, Importe y Beneficio para que Sheets deje de reinterpretar
+    los valores según el locale regional. Ejecutar una vez si los números
+    aparecen multiplicados por 10 o 100.
+    """
+    ws = _get_sheet()
+    sh = ws.spreadsheet
+    requests = [{
+        "repeatCell": {
+            "range": {
+                "sheetId": ws.id,
+                "startRowIndex": 1,
+                "startColumnIndex": col - 1,
+                "endColumnIndex": col
+            },
+            "cell": {
+                "userEnteredFormat": {
+                    "numberFormat": {"type": "NUMBER", "pattern": "0.00"}
+                }
+            },
+            "fields": "userEnteredFormat.numberFormat"
+        }
+    } for col in (COL_SB["CUOTA"], COL_SB["IMPORTE"], COL_SB["RETORNO"], COL_SB["BENEFICIO"])]
+
+    sh.batch_update({"requests": requests})

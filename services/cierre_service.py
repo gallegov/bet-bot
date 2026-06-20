@@ -278,8 +278,8 @@ def ejecutar_cierre_mensual() -> dict:
     sh = gc.open_by_key(GOOGLE_SHEET_ID)
 
     # Leer datos actuales
-    all_bets     = sh.worksheet(SHEET_NAME_BETS).get_all_records()
-    all_surebets = sh.worksheet(SHEET_NAME_SUREBETS).get_all_records()
+    all_bets     = sh.worksheet(SHEET_NAME_BETS).get_all_records(value_render_option='UNFORMATTED_VALUE')
+    all_surebets = sh.worksheet(SHEET_NAME_SUREBETS).get_all_records(value_render_option='UNFORMATTED_VALUE')
 
     # Separar pendientes del resto
     bets_pendientes = [r for r in all_bets     if r.get("Estado") == "PENDIENTE"]

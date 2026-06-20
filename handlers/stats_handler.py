@@ -15,7 +15,7 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         ws = _get_sheet(SHEET_NAME_BETS)
-        rows = ws.get_all_records()
+        rows = ws.get_all_records(value_render_option='UNFORMATTED_VALUE')
     except Exception as e:
         await msg.edit_text(f"❌ Error al leer Sheets: {e}")
         return

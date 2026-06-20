@@ -161,7 +161,7 @@ def deposit_withdraw(casa: str, amount: float) -> dict:
     if row is None:
         raise ValueError(f"Casa '{casa}' no encontrada en la hoja BankRoll")
 
-    saldo_actual = _safe_float(ws.cell(row, 1).value)
+    saldo_actual = _safe_float(ws.cell(row, 1, value_render_option='UNFORMATTED_VALUE').value)
     nuevo_saldo  = round(saldo_actual + amount, 2)
     ws.update_cell(row, 1, nuevo_saldo)
 

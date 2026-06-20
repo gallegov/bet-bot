@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
-from services.sheets_service import get_pending_bets, update_bet_result
+from services.sheets_service import get_pending_bets, update_bet_result, format_fecha_legible
 from services.sports_service import get_result
 from services.resolver_service import resolver_apuesta
 from services.bankroll_service import async_update_bankroll
@@ -145,7 +145,7 @@ async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"❓ *Apuesta #{bet_id} — resolución manual*\n\n"
                 f"🏟 {evento}\n"
                 f"🎯 {descripcion}\n"
-                f"📅 {fecha or 'sin fecha'}\n"
+                f"📅 {format_fecha_legible(fecha) or 'sin fecha'}\n"
                 f"📈 Cuota {cuota} · {importe}€ apostados",
                 parse_mode="Markdown",
                 reply_markup=keyboard

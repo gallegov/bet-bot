@@ -128,3 +128,32 @@ def update_bet_fields(row_index: int, campos: dict):
         col = campo_col.get(campo)
         if col:
             ws.update_cell(row_index, col, valor)
+
+def format_fecha_legible(valor) -> str:
+    """
+    Convierte un valor de fecha leído con UNFORMATTED_VALUE a texto legible.
+    Si ya es texto (DD/MM/YYYY), lo devuelve tal cual.
+    Si es número de serie de Google Sheets, lo convierte a DD/MM/YYYY.
+    Si está vacío, devuelve cadena vacía.
+    """
+    if not valor and valor != 0:
+        return ""
+
+    s = str(valor).strip()
+    if not s:
+        return ""
+
+    # Número de serie de Sheets (fecha guardada como float)
+    if s.replace(".", "", 1).isdigit():
+        try:
+            from datetime import datetime, timedelta
+            serial = float(s)
+            dt = datetime(1899, 12, 30) + timedelta(days=serial)
+            # Si tiene parte horaria (decimales), incluirla
+            if serial % 1 != 0:
+                return dt.strftime("%d/%m/%Y %H:%M")
+            return dt.strftime("%d/%m/%Y")
+        except (ValueError, OverflowError):
+            return s
+
+    return s

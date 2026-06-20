@@ -16,6 +16,7 @@ limpia del mes nuevo para que puedas seguir resolviéndolas.
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
+from services.sheets_service import format_fecha_legible
 from config.settings import (
     GOOGLE_SHEETS_CREDENTIALS_FILE, GOOGLE_SHEET_ID,
     SHEET_NAME_BETS, SHEET_NAME_SUREBETS,
@@ -190,7 +191,7 @@ def _escribir_hoja_cierre(sh, nombre_hoja: str, mes_label: str,
     ]
     for r in apuestas:
         rows_out.append([
-            r.get("Fecha registro", ""), r.get("Casa", ""),
+            format_fecha_legible(r.get("Fecha registro", "")), r.get("Casa", ""),
             r.get("Evento", ""),         r.get("Descripción", ""),
             r.get("Cuota", ""),          r.get("Importe (€)", ""),
             r.get("Estado", ""),         r.get("Beneficio/Pérd. (€)", ""),
@@ -207,7 +208,7 @@ def _escribir_hoja_cierre(sh, nombre_hoja: str, mes_label: str,
         ]
         for r in surebets:
             rows_out.append([
-                r.get("Fecha", ""),    r.get("Partido", ""),
+                format_fecha_legible(r.get("Fecha", "")),    r.get("Partido", ""),
                 r.get("Casa", ""),     r.get("Pronóstico", ""),
                 r.get("Cuota", ""),    r.get("Importe (€)", ""),
                 r.get("Estado", ""),   r.get("Beneficio/Pérd. (€)", ""),

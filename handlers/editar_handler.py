@@ -20,7 +20,7 @@ from telegram.ext import (
     ContextTypes, ConversationHandler, CommandHandler,
     MessageHandler, CallbackQueryHandler, filters,
 )
-from services.sheets_service import get_bet_by_id, update_bet_fields
+from services.sheets_service import get_bet_by_id, update_bet_fields, format_fecha_legible
 from services.bankroll_service import CASAS
 from utils.security import security_check
 from utils.topic_filter import check_topic, TEMA_CAPTURAS
@@ -44,7 +44,7 @@ def _resumen_apuesta(bet: dict) -> str:
         f"*Apuesta #{bet.get('ID', '?')}*\n\n"
         f"🏟 {bet.get('Evento', '?')}\n"
         f"🏠 Casa: *{bet.get('Casa', '?')}*\n"
-        f"📅 Fecha partido: *{bet.get('Fecha partido', 'No detectada')}*\n"
+        f"📅 Fecha partido: *{format_fecha_legible(bet.get('Fecha partido')) or 'No detectada'}*\n"
         f"📈 Cuota: *{bet.get('Cuota', '?')}*\n"
         f"💶 Importe: *{bet.get('Importe (€)', '?')}€*\n"
         f"Estado: {bet.get('Estado', '?')}"

@@ -82,18 +82,28 @@ async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Saltar apuestas cuya fecha de partido aún no ha llegado
         if fecha:
             try:
-                for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
-                    try:
-                        fecha_dt = datetime.strptime(fecha.strip()[:10], fmt)
-                        break
-                    except ValueError:
-                        continue
+                fecha_str = str(fecha).strip()
+                fecha_dt = None
+
+                # Caso 1: número de serie de Google Sheets (fecha como float)
+                if fecha_str.replace(".", "", 1).isdigit():
+                    from datetime import timedelta
+                    serial = float(fecha_str)
+                    # Google Sheets epoch: 30/12/1899
+                    fecha_dt = datetime(1899, 12, 30) + timedelta(days=serial)
                 else:
-                    fecha_dt = None
+                    # Caso 2: texto con formato de fecha
+                    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
+                        try:
+                            fecha_dt = datetime.strptime(fecha_str[:10], fmt)
+                            break
+                        except ValueError:
+                            continue
+
                 if fecha_dt and fecha_dt.date() > datetime.now().date():
                     continue  # partido futuro, ignorar
-            except Exception:
-                pass  # si no parsea la fecha, seguimos adelante
+            except Exception as e:
+                logger.warning(f"No se pudo parsear fecha '{fecha}' de apuesta #{bet_id}: {e}")
 
         resultado = await asyncio.to_thread(get_result, deporte, evento, fecha)
         estado, desc_res, beneficio = resolver_apuesta(bet, resultado)

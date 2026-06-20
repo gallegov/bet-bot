@@ -18,13 +18,25 @@ HEADERS_TENNIS      = {"x-apisports-key": API_SPORTS_KEY}
 # Utilidades
 # ─────────────────────────────────────────────
 
-def _parse_date(date_str: str) -> str | None:
-    """Convierte DD/MM/YYYY a YYYY-MM-DD."""
+def _parse_date(date_str) -> str | None:
+    """Convierte DD/MM/YYYY, número de serie de Sheets, o YYYY-MM-DD a YYYY-MM-DD."""
     if not date_str:
         return None
+
+    s = str(date_str).strip()
+
+    # Caso: número de serie de Google Sheets (fecha guardada como float)
+    if s.replace(".", "", 1).isdigit():
+        try:
+            serial = float(s)
+            dt = datetime(1899, 12, 30) + timedelta(days=serial)
+            return dt.strftime("%Y-%m-%d")
+        except (ValueError, OverflowError):
+            return None
+
     for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
         try:
-            return datetime.strptime(date_str, fmt).strftime("%Y-%m-%d")
+            return datetime.strptime(s, fmt).strftime("%Y-%m-%d")
         except ValueError:
             continue
     return None

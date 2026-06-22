@@ -66,7 +66,7 @@ async def receive_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Construir teclado inline con todas las casas (2 por fila)
     buttons = [
-        InlineKeyboardButton(casa, callback_data=f"br_{casa}")
+        InlineKeyboardButton(casa, callback_data=f"br_{casa.replace(' ', '~')}")
         for casa in CASAS
     ]
     # Agrupar de 2 en 2
@@ -89,7 +89,7 @@ async def receive_casa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    casa   = query.data[3:]   # quitar prefijo "br_"
+    casa   = query.data[3:].replace("~", " ")   # quitar prefijo "br_" y decodificar espacios
     amount = context.user_data.get("br_amount", 0)
     tipo   = context.user_data.get("br_tipo", "deposito")
 

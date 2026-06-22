@@ -139,8 +139,8 @@ def update_bankroll(casa: str, delta_caja: float, delta_mes: float) -> dict:
     nuevo_mes    = round(mes_actual + delta_mes, 2)
 
     # Escribir los dos valores en batch (una sola llamada si están en la misma fila)
-    ws.update_cell(row, 1, nuevo_saldo)
-    ws.update_cell(row, mes_col, nuevo_mes)
+    ws.update_cell(row, 1, nuevo_saldo, value_input_option="RAW")
+    ws.update_cell(row, mes_col, nuevo_mes, value_input_option="RAW")
 
     return {
         "casa":        casa,
@@ -163,7 +163,7 @@ def deposit_withdraw(casa: str, amount: float) -> dict:
 
     saldo_actual = _safe_float(ws.cell(row, 1, value_render_option='UNFORMATTED_VALUE').value)
     nuevo_saldo  = round(saldo_actual + amount, 2)
-    ws.update_cell(row, 1, nuevo_saldo)
+    ws.update_cell(row, 1, nuevo_saldo, value_input_option="RAW")
 
     return {"casa": casa, "nuevo_saldo": nuevo_saldo}
 

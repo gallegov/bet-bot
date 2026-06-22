@@ -149,7 +149,7 @@ def resolve_surebet(surebet_id: str, casa_ganadora: str) -> dict:
 
         resumen["beneficio_neto"] += beneficio
         # Columnas J (Estado=10) y K (Beneficio=11)
-        ws.update(f"J{row_idx}:K{row_idx}", [[estado, round(beneficio, 2)]])
+        ws.update(f"J{row_idx}:K{row_idx}", [[estado, round(beneficio, 2)]], value_input_option="RAW")
 
     return resumen
 

@@ -23,6 +23,7 @@ def resolver_apuesta(bet: dict, resultado: dict) -> tuple[str, str, float]:
     importe     = float(bet.get("Importe (€)", 0))
 
     ganado = False
+    resuelto = False  # True solo si alguna rama logró determinar el resultado
     desc_resultado = resultado.get("marcador") or resultado.get("ganador") or "Finalizado"
 
     # ── 1X2 / GANADOR ────────────────────────────────────────────────
@@ -33,12 +34,16 @@ def resolver_apuesta(bet: dict, resultado: dict) -> tuple[str, str, float]:
         if signo:
             if "local" in descripcion or "1" == descripcion.strip() or resultado.get("home", "").lower() in descripcion:
                 ganado = signo == "1"
+                resuelto = True
             elif "empate" in descripcion or "x" == descripcion.strip():
                 ganado = signo == "X"
+                resuelto = True
             elif "visitante" in descripcion or "2" == descripcion.strip() or resultado.get("away", "").lower() in descripcion:
                 ganado = signo == "2"
+                resuelto = True
         elif ganador:
             ganado = ganador.lower() in descripcion
+            resuelto = True
 
     # ── OVER / UNDER ─────────────────────────────────────────────────
     elif "over" in descripcion or "under" in descripcion or "más" in descripcion or "menos" in descripcion:
@@ -53,6 +58,7 @@ def resolver_apuesta(bet: dict, resultado: dict) -> tuple[str, str, float]:
                     ganado = total > linea
                 else:
                     ganado = total < linea
+                resuelto = True
 
     # ── HANDICAP ─────────────────────────────────────────────────────
     elif "handicap" in tipo.lower() or "handicap" in descripcion:
@@ -68,6 +74,12 @@ def resolver_apuesta(bet: dict, resultado: dict) -> tuple[str, str, float]:
                 ganado = (gh + handicap) > ga
             else:
                 ganado = (ga + handicap) > gh
+            resuelto = True
+
+    # Si ningún patrón pudo determinar el resultado, dejar pendiente
+    # para resolución manual en vez de marcar como perdida por defecto.
+    if not resuelto:
+        return None, None, 0.0
 
     # ── Calcular beneficio ────────────────────────────────────────────
     if ganado:

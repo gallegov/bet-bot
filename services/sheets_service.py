@@ -101,7 +101,7 @@ def get_pending_bets() -> list[dict]:
 
 def update_bet_result(row_index: int, estado: str, resultado: str, beneficio: float):
     ws = _get_sheet(SHEET_NAME_BETS)
-    ws.update(f"K{row_index}:M{row_index}", [[estado, resultado, round(beneficio, 2)]])
+    ws.update(f"K{row_index}:M{row_index}", [[estado, resultado, round(beneficio, 2)]], value_input_option="RAW")
 
 def get_bet_by_id(bet_id: int) -> dict | None:
     """Busca una apuesta por ID. Devuelve la fila con row_index o None."""
@@ -116,6 +116,7 @@ def update_bet_fields(row_index: int, campos: dict):
     """
     Actualiza campos individuales de una apuesta.
     campos es un dict con claves del COL map: "casa", "fecha_partido", "cuota", "importe"
+    Usa RAW para evitar que Sheets reinterprete números/fechas según el locale regional.
     """
     ws = _get_sheet(SHEET_NAME_BETS)
     campo_col = {
@@ -127,7 +128,7 @@ def update_bet_fields(row_index: int, campos: dict):
     for campo, valor in campos.items():
         col = campo_col.get(campo)
         if col:
-            ws.update_cell(row_index, col, valor)
+            ws.update_cell(row_index, col, valor, value_input_option="RAW")
 
 def format_fecha_legible(valor) -> str:
     """

@@ -122,21 +122,22 @@ async def cmd_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
             cuota    = float(bet.get("Cuota", 1) or 1)
             ganancia = round(importe * cuota - importe, 2)
 
+            casa_safe = casa.replace(" ", "~")  # Telegram no admite espacios en callback_data
             keyboard = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton(
                         f"✅ Ganada (+{ganancia}€)",
-                        callback_data=f"res_WIN_{row_idx}_{bet_id}_{importe}_{cuota}_{casa}"
+                        callback_data=f"res_WIN_{row_idx}_{bet_id}_{importe}_{cuota}_{casa_safe}"
                     ),
                     InlineKeyboardButton(
                         f"❌ Perdida (-{importe}€)",
-                        callback_data=f"res_LOSE_{row_idx}_{bet_id}_{importe}_{cuota}_{casa}"
+                        callback_data=f"res_LOSE_{row_idx}_{bet_id}_{importe}_{cuota}_{casa_safe}"
                     ),
                 ],
                 [
                     InlineKeyboardButton(
                         "🚫 Void (devuelto)",
-                        callback_data=f"res_VOID_{row_idx}_{bet_id}_{importe}_{cuota}_{casa}"
+                        callback_data=f"res_VOID_{row_idx}_{bet_id}_{importe}_{cuota}_{casa_safe}"
                     ),
                 ]
             ])
@@ -181,7 +182,7 @@ async def callback_resolver(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bet_id  = parts[3]
     importe = float(parts[4])
     cuota   = float(parts[5])
-    casa    = parts[6] if len(parts) > 6 else ""
+    casa    = parts[6].replace("~", " ") if len(parts) > 6 else ""
 
     if accion == "WIN":
         estado    = ESTADO_GANADA

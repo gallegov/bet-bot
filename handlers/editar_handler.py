@@ -129,7 +129,7 @@ async def elegir_campo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Si es casa → mostrar teclado inline con casas
     if info["tipo"] == "casa":
         botones = [
-            InlineKeyboardButton(c, callback_data=f"editval_{bet_id}_{campo}_{c}")
+            InlineKeyboardButton(c, callback_data=f"editval_{bet_id}_{campo}_{c.replace(' ', '~')}")
             for c in CASAS
         ]
         keyboard = InlineKeyboardMarkup(
@@ -163,11 +163,11 @@ async def elegir_casa_valor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # Formato: editval_{bet_id}_{campo}_{valor}
+    # Formato: editval_{bet_id}_{campo}_{valor}  (espacios codificados como ~)
     parts  = query.data.split("_", 3)
     bet_id = int(parts[1])
     campo  = parts[2]
-    valor  = parts[3]
+    valor  = parts[3].replace("~", " ")
 
     bet = context.user_data.get("edit_bet", {})
     row_index = bet.get("row_index")

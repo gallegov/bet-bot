@@ -214,7 +214,7 @@ def _escribir_hoja_cierre(sh, nombre_hoja: str, mes_label: str,
                 r.get("Estado", ""),   r.get("Beneficio/Pérd. (€)", ""),
             ])
 
-    ws.update("A1", rows_out)
+    ws.update("A1", rows_out, value_input_option="RAW")
     ws.format("A1", {"textFormat": {"bold": True, "fontSize": 14}})
     return ws
 

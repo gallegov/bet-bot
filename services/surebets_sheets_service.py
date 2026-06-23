@@ -141,7 +141,7 @@ def resolve_surebet(surebet_id: str, casa_ganadora: str) -> dict:
         if casa.strip().lower() == casa_ganadora.strip().lower():
             beneficio = round(cuota * importe - importe, 2)
             estado    = ESTADO_GANADA
-            resumen["ganada"] = {"casa": casa, "beneficio": beneficio}
+            resumen["ganada"] = {"casa": casa, "beneficio": beneficio, "importe": importe, "retorno": round(cuota * importe, 2)}
         else:
             beneficio = -importe
             estado    = ESTADO_PERDIDA

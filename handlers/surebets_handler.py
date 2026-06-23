@@ -238,9 +238,8 @@ async def callback_surebet_resolver(update: Update, context: ContextTypes.DEFAUL
 
     if g.get("casa"):
         try:
-            # Stake ya descontado al registrar → devolver retorno completo (stake + beneficio)
-            importe_g = float(g.get("importe", p.get("perdida", 0)))  # stake de la ganadora
-            retorno_g = importe_g + g["beneficio"]
+            # Stake ya descontado al registrar → devolver el retorno completo (cuota × stake)
+            retorno_g = g["retorno"]
             logger.info(f"BankRoll ganadora: '{g['casa']}' retorno={retorno_g:+.2f}")
             await async_update_bankroll(g["casa"], delta_caja=retorno_g, delta_mes=0)
         except Exception as e:

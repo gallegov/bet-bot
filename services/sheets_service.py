@@ -128,7 +128,8 @@ def update_bet_fields(row_index: int, campos: dict):
     for campo, valor in campos.items():
         col = campo_col.get(campo)
         if col:
-            ws.update_cell(row_index, col, valor, value_input_option="RAW")
+            cell = gspread.utils.rowcol_to_a1(row_index, col)
+            ws.update([[valor]], cell, value_input_option="RAW")
 
 def format_fecha_legible(valor) -> str:
     """
